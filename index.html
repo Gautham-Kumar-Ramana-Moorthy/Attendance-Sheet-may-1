@@ -1,95 +1,107 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Attendance Form</title>
-  <meta charset="UTF-8">
-  <script src="https://openfpcdn.io/fingerprintjs/v3"></script>
-</head>
-<body>
-  <h3>Attendance Form</h3>
-  <form id="attendanceForm">
-    <label>Full Name:</label><br>
-    <input type="text" name="Full Name" required><br><br>
+  <head>
+    <base target="_top">
+    <script async src="https://openfpcdn.io/fingerprintjs/v3"></script>
+    <title>Attendance Form</title>
+  </head>
+  <body>
+    <h3>Attendance Form</h3>
+    <form id="attendanceForm">
+      <label>Full Name:</label><br>
+      <input type="text" name="Full Name" required><br><br>
 
-    <label>Student Number:</label><br>
-    <input type="number" name="Student Number" required><br><br>
+      <label>Student Number:</label><br>
+      <input type="number" name="Student Number" required><br><br>
 
-    <label>University Email:</label><br>
-    <input type="email" name="University Email" required><br><br>
+      <label>University Email:</label><br>
+      <input type="email" name="University Email" required><br><br>
 
-    <label>Group Number:</label><br>
-    <input type="text" name="Group Number" required><br><br>
+      <label>Group Number:</label><br>
+      <input type="text" name="Group Number" required><br><br>
 
-    <input type="hidden" name="Latitude">
-    <input type="hidden" name="Longitude">
-    <input type="hidden" name="Device Fingerprint">
-    <input type="hidden" name="IP Address">
+      <input type="hidden" name="Latitude">
+      <input type="hidden" name="Longitude">
+      <input type="hidden" name="Device Fingerprint">
+      <input type="hidden" name="IP Address">
 
-    <button type="submit">Submit Attendance</button>
-  </form>
+      <button type="submit">Submit Attendance</button>
+    </form>
 
-  <div id="result"></div>
+    <div id="result"></div>
 
-  <script>
-    const form = document.getElementById("attendanceForm");
-    const result = document.getElementById("result");
+    <script>
+      const form = document.getElementById("attendanceForm");
+      const result = document.getElementById("result");
 
-    async function getFingerprint() {
-      const fpPromise = FingerprintJS.load();
-      const fp = await fpPromise;
-      const result = await fp.get();
-      return result.visitorId;
-    }
-
-    async function getIPAddress() {
-      try {
-        const res = await fetch('https://api.ipify.org?format=json');
-        const data = await res.json();
-        return data.ip;
-      } catch {
-        return "Unavailable";
+      async function waitForFingerprintJS() {
+        return new Promise((resolve) => {
+          const check = () => {
+            if (window.FingerprintJS) resolve();
+            else setTimeout(check, 100);
+          };
+          check();
+        });
       }
-    }
 
-    function getLocation() {
-      return new Promise((resolve, reject) => {
-        if (!navigator.geolocation) return reject("Geolocation not supported.");
-        navigator.geolocation.getCurrentPosition(
-          pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-          () => reject("Unable to retrieve location.")
-        );
-      });
-    }
+      async function getFingerprint() {
+        await waitForFingerprintJS();
+        const fp = await FingerprintJS.load();
+        const result = await fp.get();
+        return result.visitorId;
+      }
 
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      result.textContent = "Submitting...";
-
-      try {
-        const loc = await getLocation();
-        form["Latitude"].value = loc.lat;
-        form["Longitude"].value = loc.lng;
-
-        form["Device Fingerprint"].value = await getFingerprint();
-        form["IP Address"].value = await getIPAddress();
-
-        const formData = new FormData(form);
-        const params = new URLSearchParams();
-        for (const [key, value] of formData.entries()) {
-          params.append(key, value);
+      async function getIPAddress() {
+        try {
+          const res = await fetch('https://api.ipify.org?format=json');
+          const data = await res.json();
+          return data.ip;
+        } catch {
+          return "Unavailable";
         }
-
-        const response = await fetch(
-          "https://script.google.com/macros/s/AKfycbzqLDJpO4157eABU-OD8u70dV8Iz6TylB79bi61o4ghZ1mAbgL-b-wNQTiE2XEJN8-Qhw/exec",
-          { method: "POST", body: params }
-        );
-
-        const message = await response.text();
-        result.innerHTML = `<p><strong>${message}</strong></p>`;
-      } catch (err) {
-        result.innerHTML = `<p><strong>Error: ${err}</strong></p>`;
       }
-    });
-  </script>
-</body>
+
+      function getLocation() {
+        return new Promise((resolve, reject) => {
+          if (!navigator.geolocation) reject("Geolocation not supported.");
+          navigator.geolocation.getCurrentPosition(pos => {
+            resolve({
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude
+            });
+          }, () => reject("Unable to retrieve location."));
+        });
+      }
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        result.textContent = "Submitting...";
+
+        try {
+          const loc = await getLocation();
+          form["Latitude"].value = loc.lat;
+          form["Longitude"].value = loc.lng;
+
+          form["Device Fingerprint"].value = await getFingerprint();
+          form["IP Address"].value = await getIPAddress();
+
+          const formData = new FormData(form);
+          const params = new URLSearchParams();
+          for (const [key, value] of formData.entries()) {
+            params.append(key, value);
+          }
+
+          const response = await fetch("https://script.google.com/macros/s/AKfycbzqLDJpO4157eABU-OD8u70dV8Iz6TylB79bi61o4ghZ1mAbgL-b-wNQTiE2XEJN8-Qhw/exec", {
+            method: "POST",
+            body: params
+          });
+
+          const message = await response.text();
+          result.innerHTML = `<p><strong>${message}</strong></p>`;
+        } catch (err) {
+          result.textContent = "Error: " + err;
+        }
+      });
+    </script>
+  </body>
 </html>
